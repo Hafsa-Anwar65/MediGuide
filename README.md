@@ -1,167 +1,210 @@
-# MediGuide – Run karne ki guide
+<div align="center">
 
-**Kaam:** Robot ward mein khada hai. Nurse parchi tray mein rakh kar **Ward** button dabati hai. Robot pharmacy jata hai. Pharmacist parchi parh kar dawai rakhta hai aur **Return** dabata hai. Robot wapas ward aa jata hai.
+# MediGuide
 
-- Sirf **ek ward** aur **ek pharmacy**
-- Floor par **koi line nahi**. Robot pehle se likhe directions par chalta hai (seedha, right, left)
+**A robot that brings medicine from the hospital pharmacy to the ward, so nurses can stay with their patients.**
+
+![ROS Noetic](https://img.shields.io/badge/ROS-Noetic-22314E?logo=ros&logoColor=white)
+![Ubuntu 20.04](https://img.shields.io/badge/Ubuntu-20.04-E95420?logo=ubuntu&logoColor=white)
+![ESP32](https://img.shields.io/badge/ESP32-rosserial-E7352C?logo=espressif&logoColor=white)
+![Gazebo](https://img.shields.io/badge/Simulation-Gazebo-F58113)
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+
+</div>
+
+---
+
+## The problem
+
+In many hospitals, nurses walk to the pharmacy several times a day just to collect medicine. Every trip takes them away from their patients, and on busy days the same trip repeats again and again.
+
+## The idea
+
+MediGuide waits in the ward. When medicine is needed:
+
+1. The nurse writes the medicine names on a slip, puts it in the robot's tray and presses the **Ward** button.
+2. The tray lid closes and the robot drives to the pharmacy.
+3. At the pharmacy the lid opens. The pharmacist reads the slip, puts the medicine in the tray and presses **Return**.
+4. The lid closes, the robot drives back to the ward and opens the lid for the nurse.
+
+The lid stays closed while the robot is moving, so the medicine cannot fall out and no one else can take it on the way.
+
+```mermaid
+flowchart LR
+    A([Robot waits in ward]) --> B[Nurse puts slip,<br/>presses Ward]
+    B --> C[Lid closes,<br/>robot goes to pharmacy]
+    C --> D[Lid opens,<br/>pharmacist loads medicine]
+    D --> E{Return pressed?}
+    E -- no --> D
+    E -- yes --> F[Lid closes,<br/>robot returns to ward]
+    F --> G[Lid opens,<br/>nurse takes medicine]
+    G --> A
+```
+
+## Features
+
+- **Two-button operation:** no screen and no app, so there is nothing new for hospital staff to learn
+- **Secure tray:** an SG90 servo keeps the lid closed while the robot is moving
+- **Obstacle stop:** a front IR sensor pauses the robot until the way is clear
+- **Wireless:** the ESP32 talks to ROS over Wi-Fi using rosserial, with no cable to the laptop
+- **Route in a config file:** the path is a list of simple moves (`F150`, `R90`, …) in YAML, and the way back is generated automatically
+- **Full Gazebo simulation:** a hospital world with AMCL localization and move_base path planning
+- **Mapping demo:** build the hospital map yourself with gmapping
+
+## System architecture
+
+```mermaid
+flowchart LR
+    subgraph Robot["Robot"]
+        BTN[Ward / Return<br/>buttons] --> ESP
+        IR[IR obstacle<br/>sensor] --> ESP
+        ESP[ESP32<br/>firmware]
+        ESP --> SERVO[SG90 servo<br/>tray lid]
+        ESP --> MOT[L298N +<br/>4 DC motors]
+    end
+
+    subgraph ROS["Laptop (ROS Noetic)"]
+        BRIDGE[rosserial<br/>TCP bridge] <--> DM[deliverymanager<br/>state machine]
+        DM <--> RS[routeserver<br/>GetRoute service]
+        YAML[(stations.yaml)] --> RS
+    end
+
+    ESP <-- Wi-Fi --> BRIDGE
+```
+
+The same `deliverymanager` node drives both the real robot and the simulation. In **real** mode it sends the route to the ESP32. In **sim** mode it sends goals to `move_base`.
+
+## ROS interface
+
+| Name | Type | Direction | Purpose |
+| --- | --- | --- | --- |
+| `/robot/button` | `std_msgs/String` | ESP32 → ROS | `ward` or `return` |
+| `/robot/go` | `std_msgs/String` | ROS → ESP32 | Route, e.g. `F150,R90,F400,L90,F100,U` |
+| `/robot/arrived` | `std_msgs/Bool` | ESP32 → ROS | Route finished |
+| `/robot/obstacle` | `std_msgs/Bool` | ESP32 → ROS | Something is in front |
+| `/robot/lid` | `std_msgs/Bool` | ROS → ESP32 | `true` = open |
+| `/robot/status` | `std_msgs/String` | ROS | What the robot is doing now |
+| `/getroute` | `mediguide/GetRoute` | service | Route between `ward` and `pharmacy` |
+| `/stations` | `visualization_msgs/MarkerArray` | ROS → RViz | Station labels on the map |
+
+## Repository structure
 
 ```
 MediGuide/
-├── setup.sh                 ← sab kuch install aur build karta hai
-├── README.md                ← ye guide
-├── mediguide/               ← ROS package
+├── setup.sh                     # installs dependencies and builds the workspace
+├── GUIDE.md                     # step-by-step run guide (Roman Urdu)
+├── mediguide/                   # ROS package
 │   ├── scripts/
-│   │   ├── deliverymanager.py   (robot ka dimagh, state machine)
-│   │   ├── routeserver.py       (custom service: raasta aur directions)
-│   │   ├── stationmarkers.py    (RViz mein Ward/Pharmacy ke naam)
-│   │   └── nursepanel.py        (simulation ke liye keyboard buttons)
-│   ├── srv/GetRoute.srv     ← custom service
-│   ├── config/stations.yaml ← directions aur locations (yahan badlein)
-│   ├── config/mediguide.rviz
-│   ├── launch/
-│   ├── worlds/hospital.world← Gazebo hospital
-│   ├── maps/                ← hospital ka map (AMCL ke liye)
-│   └── tools/makehospital.py
-└── esp32/MediGuideESP32/MediGuideESP32.ino ← ESP32 ka code
+│   │   ├── deliverymanager.py   # delivery state machine
+│   │   ├── routeserver.py       # GetRoute service
+│   │   ├── stationmarkers.py    # RViz markers
+│   │   └── nursepanel.py        # keyboard buttons for simulation
+│   ├── srv/GetRoute.srv
+│   ├── config/                  # stations.yaml, RViz config
+│   ├── launch/                  # simulation, mapping and real robot
+│   ├── worlds/hospital.world    # Gazebo hospital
+│   ├── maps/                    # map used by AMCL
+│   └── tools/makehospital.py    # generates the world and map from one wall list
+└── esp32/MediGuideESP32/        # ESP32 firmware
 ```
 
----
+## Getting started
 
-## PART 1: Setup / Update
+### Requirements
 
-Naya version aane par bhi yahi karna hai:
+- Ubuntu 20.04
+- ROS Noetic (installed by `setup.sh` if missing)
+
+### Install and build
 
 ```bash
-cd ~/Downloads/MediGuide
+git clone https://github.com/Hafsa-Anwar65/MediGuide.git
+cd MediGuide
 bash setup.sh
 ```
-"DONE" aaye to terminal band karke naya kholein.
 
----
+Open a new terminal after the script finishes.
 
-## PART 2: Gazebo simulation
+### Run the simulation
 
-**Terminal 1:**
 ```bash
+# Terminal 1: Gazebo hospital, AMCL, move_base and RViz
 roslaunch mediguide simulation.launch
-```
 
-**Terminal 2:**
-```bash
+# Terminal 2: keyboard version of the two buttons
 rosrun mediguide nursepanel.py
 ```
 
-| Key | Matlab |
-|---|---|
-| `w` | Nurse ne **Ward** button dabaya → robot pharmacy jayega |
-| `r` | Pharmacist ne **Return** dabaya → robot ward wapas aayega |
-| `q` | Band karein |
+Press `w` to send the robot to the pharmacy and `r` to bring it back. On slower machines, add `gui:=false` to the first command to run without the Gazebo window.
 
-Simulation mein robot khud raasta dhoondta hai (AMCL + move_base). RViz mein neeli line planned path hai.
-
----
-
-## PART 3: gmapping se map banana (demo ke liye)
+### Build the map with gmapping
 
 ```bash
-roslaunch mediguide mapping.launch                          # Terminal 1
-rosrun teleop_twist_keyboard teleop_twist_keyboard.py       # Terminal 2
-rosrun map_server map_saver -f ~/hospital_gmapping          # Terminal 3, map save
-```
-Teleop: `i` aage, `,` peeche, `j` / `l` ghoomna, `k` rukna.
-
----
-
-## PART 4: Viva ke liye commands
-
-```bash
-rosrun rqt_graph rqt_graph                    # nodes aur topics ka diagram
-rostopic echo /robot/status                   # robot kya kar raha hai
-rosservice call /getroute ward pharmacy      # custom service test
-rosparam get /route_to_pharmacy               # YAML se aaye directions
+roslaunch mediguide mapping.launch
+rosrun teleop_twist_keyboard teleop_twist_keyboard.py
+rosrun map_server map_saver -f ~/hospital_map
 ```
 
----
+## Real robot
 
-## PART 5: Asli robot (ESP32)
+### Hardware
 
-### Directions kaise likhni hain
-
-`mediguide/config/stations.yaml` mein:
-```yaml
-route_to_pharmacy: ["F150", "R90", "F400", "L90", "F100"]
-```
-| Code | Matlab |
-|---|---|
-| `F150` | 150 cm seedha |
-| `R90` | 90° right mudo |
-| `L90` | 90° left mudo |
-
-Ward se pharmacy tak ka asli raasta naap kar ye numbers badlein. **Wapsi ka raasta khud ban jata hai** (ulta order, right ↔ left). Har trip ke aakhir mein robot U-turn leta hai taake agli trip ke liye tayyar ho.
-
-YAML badalne ke baad dobara `bash setup.sh` chalayein.
+| Part | Qty |
+| --- | --- |
+| Car chassis with 4 DC motors and wheels | 1 |
+| L298N motor driver | 1 |
+| 12V battery and on/off switch | 1 |
+| ESP32 dev board | 1 |
+| LM2596 buck converter (12V → 5V) | 1 |
+| IR obstacle sensor (FC-51) | 1 |
+| SG90 servo | 1 |
+| Push buttons | 2 |
+| Breadboard, jumper wires, small tray | — |
 
 ### Wiring
 
-| ESP32 pin | Kahan jayega |
-|---|---|
-| GPIO 14 | L298N **ENA** (jumper hata dein) |
-| GPIO 27 | L298N IN1 |
-| GPIO 26 | L298N IN2 |
-| GPIO 32 | L298N **ENB** (jumper hata dein) |
-| GPIO 25 | L298N IN3 |
-| GPIO 33 | L298N IN4 |
-| GPIO 34 | Front IR obstacle sensor – OUT |
-| GPIO 13 | SG90 servo – signal (orange) |
-| GPIO 18 | Ward button (doosra sira GND) |
-| GPIO 19 | Return button (doosra sira GND) |
-| 5V / VIN | Buck converter 5V output |
-| GND | Buck converter GND **aur** L298N GND (common ground zaroori) |
+| ESP32 pin | Connects to |
+| --- | --- |
+| GPIO 14 / 27 / 26 | L298N ENA / IN1 / IN2 (left motors) |
+| GPIO 32 / 25 / 33 | L298N ENB / IN3 / IN4 (right motors) |
+| GPIO 34 | IR sensor OUT (sensor powered from 3V3) |
+| GPIO 13 | Servo signal |
+| GPIO 18 / 19 | Ward / Return buttons (other leg to GND) |
+| VIN / GND | Buck converter 5V output |
 
-- Left motors → OUT1/OUT2, right motors → OUT3/OUT4
-- Battery 12V → L298N 12V aur buck converter input
-- **Buck converter ko pehle multimeter se 5V par set karein**, phir ESP32 lagayein
-- Servo ka red taar buck ke 5V se; **IR sensor ka VCC ESP32 ke 3V3 pin se** (5V nahi), GND sab common
+All grounds must be connected together.
 
-### Calibration (zaroori)
+### Flash and run
 
-Robot ke motors mein encoder nahi, isliye distance **time** se nikalta hai. Code mein ye do numbers apne robot ke hisaab se set karein:
-```cpp
-const float CM_PER_SECOND = 30.0;   // 1 second mein robot kitne cm chalta hai
-const float MS_PER_90_DEG = 700.0;  // 90° mudne mein kitne ms lagte hain
+1. Open `esp32/MediGuideESP32/MediGuideESP32.ino` in the Arduino IDE.
+2. Install **Rosserial Arduino Library** and **ESP32Servo** from the Library Manager.
+3. At the top of the file, set your Wi-Fi name, password and the IP of the ROS computer. Then upload to an **ESP32 Dev Module**.
+4. On the ROS computer:
+   ```bash
+   roslaunch mediguide realrobot.launch
+   ```
+
+### Set the route
+
+The path from the ward to the pharmacy lives in `mediguide/config/stations.yaml`:
+
+```yaml
+route_to_pharmacy: ["F150", "R90", "F400", "L90", "F100"]
 ```
-1. YAML mein route sirf `["F100"]` rakhein. Robot jitna chala use naapein. Agar 100 ki jagah 80 cm chala, to `CM_PER_SECOND` ko 30 × 80/100 = 24 kar dein.
-2. Phir `["R90"]` se check karein. Kam mude to `MS_PER_90_DEG` badhayein, zyada mude to kam karein.
-3. Robot seedha na chale to `SPEED_LEFT` / `SPEED_RIGHT` mein thoda farq rakhein.
 
-Battery kam hone par robot dheema ho jata hai, isliye demo se pehle battery full rakhein.
+| Move | Meaning |
+| --- | --- |
+| `F150` | forward 150 cm |
+| `R90` | turn right 90° |
+| `L90` | turn left 90° |
 
-### ESP32 mein code daalna (Windows ka Arduino IDE)
+The return route is built automatically: the order is reversed and left and right are swapped. The motors have no encoders, so distance is measured by time. Calibrate `CM_PER_SECOND` and `MS_PER_90_DEG` in the firmware for your robot.
 
-1. Boards Manager → "esp32" by Espressif (**version 2.0.x** behtar)
-2. Library Manager → **Rosserial Arduino Library** (Michael Ferguson) aur **ESP32Servo** (Kevin Harrington)
-3. `MediGuideESP32.ino` mein badlein: `WIFI_NAME`, `WIFI_PASSWORD`, aur `ROS_PC` (VM mein `hostname -I` se IP)
-4. Board: **ESP32 Dev Module** → Upload
+## Limitations and future work
 
-### VM network (sirf asli robot ke liye)
+- Without wheel encoders, the real robot moves by time, so its accuracy depends on calibration and battery level. Adding encoders or a 2D LiDAR would let the real robot use the same AMCL and move_base stack as the simulation.
+- The current version serves one ward and one pharmacy. More wards can be added as new stations.
 
-VM band karein → VirtualBox **Settings → Network → Adapter 1 → Bridged Adapter** → apna Wi-Fi adapter → OK.
+## License
 
-### Chalana
-
-```bash
-roslaunch mediguide realrobot.launch
-```
-ESP32 on karein. Connection ban jaye to robot ke buttons dabayein.
-
----
-
-## Masle aur hal
-
-| Masla | Hal |
-|---|---|
-| Gazebo band ho jata hai ya kaali screen | VirtualBox → Display → **3D Acceleration** on/off kar ke dekhein, ya pehle `export LIBGL_ALWAYS_SOFTWARE=1` |
-| Simulation slow | VM ko 4 GB+ RAM, 2+ CPU; ya `roslaunch mediguide simulation.launch gui:=false` |
-| `package 'mediguide' not found` | Naya terminal kholein |
-| Obstacle sensor ulta kaam kare | Code mein `OBSTACLE_SEEN = LOW` ko `HIGH` karein |
-| ESP32 compile error | ESP32 board version 2.0.x, phir screenshot bhejein |
+Released under the [MIT License](LICENSE).
