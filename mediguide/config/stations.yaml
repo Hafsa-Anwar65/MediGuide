@@ -1,0 +1,29 @@
+# MediGuide stations and route
+#
+# There is one ward and one pharmacy.
+#
+# route_to_pharmacy: the directions the real robot follows from the ward to the pharmacy.
+#   F<cm>  = go forward that many centimetres     e.g. F200
+#   R<deg> = turn right that many degrees         e.g. R90
+#   L<deg> = turn left that many degrees          e.g. L90
+# The way back is made automatically (same path in reverse).
+# Measure your real path and change these numbers.
+#
+# x, y, yaw: where the station is in the Gazebo hospital (metres, radians).
+
+route_to_pharmacy: ["F150", "R90", "F400", "L90", "F100"]
+
+stations:
+  ward:
+    name: "Ward"
+    x: 2.5
+    y: 2.4
+    yaw: -1.5708
+  pharmacy:
+    name: "Pharmacy"
+    x: 13.6
+    y: 0.0
+    yaw: 3.1416
+
+# Where the robot is when the system is switched on
+start_station: ward

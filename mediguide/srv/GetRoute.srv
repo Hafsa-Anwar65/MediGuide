@@ -1,0 +1,12 @@
+# Ask the route server how to go from one station to another.
+# Stations: ward, pharmacy
+string from_station
+string to_station
+---
+bool ok
+# Real robot: directions, e.g. "F150,R90,F400,L90,F100,U"  (U = turn around)
+string steps
+# Simulation: where the station is on the map
+float64 x
+float64 y
+float64 yaw

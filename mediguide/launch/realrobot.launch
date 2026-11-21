@@ -1,0 +1,13 @@
+<launch>
+  <!-- Real robot: ESP32 connects over Wi-Fi to port 11411 on this computer -->
+  <arg name="port" default="11411"/>
+
+  <node pkg="rosserial_python" type="serial_node.py" name="esp32bridge" output="screen"
+        args="tcp $(arg port)" respawn="true"/>
+
+  <rosparam command="load" file="$(find mediguide)/config/stations.yaml"/>
+  <node pkg="mediguide" type="routeserver.py" name="routeserver" output="screen"/>
+  <node pkg="mediguide" type="deliverymanager.py" name="deliverymanager" output="screen">
+    <param name="mode" value="real"/>
+  </node>
+</launch>

@@ -1,0 +1,44 @@
+<launch>
+  <!-- Map + AMCL + move_base + RViz + MediGuide nodes (simulation mode) -->
+  <arg name="model" default="burger"/>
+  <arg name="map_file" default="$(find mediguide)/maps/hospital.yaml"/>
+  <arg name="open_rviz" default="true"/>
+  <arg name="x" default="2.5"/>
+  <arg name="y" default="2.4"/>
+  <arg name="yaw" default="-1.5708"/>
+
+  <!-- Robot model and TF -->
+  <include file="$(find turtlebot3_bringup)/launch/turtlebot3_remote.launch">
+    <arg name="model" value="$(arg model)"/>
+  </include>
+
+  <!-- Hospital map -->
+  <node pkg="map_server" type="map_server" name="map_server" args="$(arg map_file)"/>
+
+  <!-- Localization -->
+  <include file="$(find turtlebot3_navigation)/launch/amcl.launch">
+    <arg name="initial_pose_x" value="$(arg x)"/>
+    <arg name="initial_pose_y" value="$(arg y)"/>
+    <arg name="initial_pose_a" value="$(arg yaw)"/>
+  </include>
+
+  <!-- Path planning -->
+  <include file="$(find turtlebot3_navigation)/launch/move_base.launch">
+    <arg name="model" value="$(arg model)"/>
+    <arg name="move_forward_only" value="false"/>
+  </include>
+
+  <!-- MediGuide -->
+  <rosparam command="load" file="$(find mediguide)/config/stations.yaml"/>
+  <node pkg="mediguide" type="routeserver.py" name="routeserver" output="screen"/>
+  <node pkg="mediguide" type="stationmarkers.py" name="stationmarkers"/>
+  <node pkg="mediguide" type="deliverymanager.py" name="deliverymanager" output="screen">
+    <param name="mode" value="sim"/>
+  </node>
+
+  <!-- RViz -->
+  <group if="$(arg open_rviz)">
+    <node pkg="rviz" type="rviz" name="rviz" required="true"
+          args="-d $(find mediguide)/config/mediguide.rviz"/>
+  </group>
+</launch>

@@ -1,0 +1,16 @@
+<launch>
+  <!-- Everything for the simulation demo in one command:
+       roslaunch mediguide simulation.launch
+       Then in a new terminal: rosrun mediguide nursepanel.py -->
+  <arg name="model" default="burger"/>
+  <arg name="gui" default="true"/>
+
+  <include file="$(find mediguide)/launch/simworld.launch">
+    <arg name="model" value="$(arg model)"/>
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+
+  <include file="$(find mediguide)/launch/simnavigation.launch">
+    <arg name="model" value="$(arg model)"/>
+  </include>
+</launch>
