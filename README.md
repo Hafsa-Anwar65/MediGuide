@@ -1,80 +1,111 @@
 <div align="center">
 
-# MediGuide
+<img src="assets/banner.svg" alt="MediGuide" width="100%"/>
 
-**A robot that brings medicine from the hospital pharmacy to the ward, so nurses can stay with their patients.**
+<br/>
 
-![ROS Noetic](https://img.shields.io/badge/ROS-Noetic-22314E?logo=ros&logoColor=white)
-![Ubuntu 20.04](https://img.shields.io/badge/Ubuntu-20.04-E95420?logo=ubuntu&logoColor=white)
-![ESP32](https://img.shields.io/badge/ESP32-rosserial-E7352C?logo=espressif&logoColor=white)
-![Gazebo](https://img.shields.io/badge/Simulation-Gazebo-F58113)
-![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![ROS Noetic](https://img.shields.io/badge/ROS-Noetic-22314E?style=for-the-badge&logo=ros&logoColor=white)
+![Ubuntu](https://img.shields.io/badge/Ubuntu-20.04-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)
+![ESP32](https://img.shields.io/badge/ESP32-Firmware-E7352C?style=for-the-badge&logo=espressif&logoColor=white)
+![Gazebo](https://img.shields.io/badge/Gazebo-Simulation-F58113?style=for-the-badge)
+
+![Python](https://img.shields.io/badge/Python-3-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![C++](https://img.shields.io/badge/Arduino-C++-00979D?style=for-the-badge&logo=arduino&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge)
+
+**[The problem](#-the-problem) · [How it works](#-how-it-works) · [Architecture](#-system-architecture) · [Quick start](#-quick-start) · [Real robot](#-real-robot)**
 
 </div>
 
 ---
 
-## The problem
+## 🏥 The problem
 
 In many hospitals, nurses walk to the pharmacy several times a day just to collect medicine. Every trip takes them away from their patients, and on busy days the same trip repeats again and again.
 
-## The idea
+## 💡 How it works
 
 MediGuide waits in the ward. When medicine is needed:
 
-1. The nurse writes the medicine names on a slip, puts it in the robot's tray and presses the **Ward** button.
-2. The tray lid closes and the robot drives to the pharmacy.
-3. At the pharmacy the lid opens. The pharmacist reads the slip, puts the medicine in the tray and presses **Return**.
-4. The lid closes, the robot drives back to the ward and opens the lid for the nurse.
+| Step | Who | What happens |
+| :---: | --- | --- |
+| 1️⃣ | 👩‍⚕️ Nurse | Writes the medicine names on a slip, puts it in the tray and presses **Ward** |
+| 2️⃣ | 🤖 Robot | Closes the tray lid and drives to the pharmacy |
+| 3️⃣ | 💊 Pharmacist | Reads the slip, puts the medicine in the tray and presses **Return** |
+| 4️⃣ | 🤖 Robot | Closes the lid, drives back to the ward and opens it for the nurse |
 
-The lid stays closed while the robot is moving, so the medicine cannot fall out and no one else can take it on the way.
+> [!TIP]
+> The lid stays closed while the robot is moving, so the medicine cannot fall out and no one else can take it on the way.
 
 ```mermaid
 flowchart LR
-    A([Robot waits in ward]) --> B[Nurse puts slip,<br/>presses Ward]
-    B --> C[Lid closes,<br/>robot goes to pharmacy]
-    C --> D[Lid opens,<br/>pharmacist loads medicine]
+    A([🛏️ Robot waits in ward]) --> B[👩‍⚕️ Nurse puts slip,<br/>presses Ward]
+    B --> C[🔒 Lid closes,<br/>robot goes to pharmacy]
+    C --> D[💊 Lid opens,<br/>pharmacist loads medicine]
     D --> E{Return pressed?}
     E -- no --> D
-    E -- yes --> F[Lid closes,<br/>robot returns to ward]
-    F --> G[Lid opens,<br/>nurse takes medicine]
+    E -- yes --> F[🔒 Lid closes,<br/>robot returns to ward]
+    F --> G[✅ Lid opens,<br/>nurse takes medicine]
     G --> A
+
+    classDef ward fill:#CCFBF1,stroke:#0F766E,color:#134E4A
+    classDef move fill:#DBEAFE,stroke:#1D4ED8,color:#1E3A8A
+    classDef pharm fill:#DCFCE7,stroke:#15803D,color:#14532D
+    classDef ask fill:#FEF3C7,stroke:#B45309,color:#78350F
+    class A,B,G ward
+    class C,F move
+    class D pharm
+    class E ask
 ```
 
-## Features
+## ✨ Features
 
-- **Two-button operation:** no screen and no app, so there is nothing new for hospital staff to learn
-- **Secure tray:** an SG90 servo keeps the lid closed while the robot is moving
-- **Obstacle stop:** a front IR sensor pauses the robot until the way is clear
-- **Wireless:** the ESP32 talks to ROS over Wi-Fi using rosserial, with no cable to the laptop
-- **Route in a config file:** the path is a list of simple moves (`F150`, `R90`, …) in YAML, and the way back is generated automatically
-- **Full Gazebo simulation:** a hospital world with AMCL localization and move_base path planning
-- **Mapping demo:** build the hospital map yourself with gmapping
+| | Feature | Details |
+| :---: | --- | --- |
+| 🔘 | **Two-button operation** | No screen and no app, so there is nothing new for hospital staff to learn |
+| 🔒 | **Secure tray** | An SG90 servo keeps the lid closed while the robot is moving |
+| 🚧 | **Obstacle stop** | A front IR sensor pauses the robot until the way is clear |
+| 📶 | **Wireless** | The ESP32 talks to ROS over Wi-Fi using rosserial, with no cable to the laptop |
+| 🗺️ | **Route in a config file** | The path is a list of simple moves (`F150`, `R90`, …) in YAML, and the way back is generated automatically |
+| 🧪 | **Full Gazebo simulation** | A hospital world with AMCL localization and move_base path planning |
+| 📡 | **Mapping demo** | Build the hospital map yourself with gmapping |
 
-## System architecture
+## 🧭 System architecture
 
 ```mermaid
 flowchart LR
-    subgraph Robot["Robot"]
-        BTN[Ward / Return<br/>buttons] --> ESP
-        IR[IR obstacle<br/>sensor] --> ESP
+    subgraph Robot["🤖 Robot"]
+        BTN[🔘 Ward / Return<br/>buttons] --> ESP
+        IR[🚧 IR obstacle<br/>sensor] --> ESP
         ESP[ESP32<br/>firmware]
-        ESP --> SERVO[SG90 servo<br/>tray lid]
-        ESP --> MOT[L298N +<br/>4 DC motors]
+        ESP --> SERVO[🔒 SG90 servo<br/>tray lid]
+        ESP --> MOT[⚙️ L298N +<br/>4 DC motors]
     end
 
-    subgraph ROS["Laptop (ROS Noetic)"]
+    subgraph ROS["💻 Laptop · ROS Noetic"]
         BRIDGE[rosserial<br/>TCP bridge] <--> DM[deliverymanager<br/>state machine]
         DM <--> RS[routeserver<br/>GetRoute service]
         YAML[(stations.yaml)] --> RS
     end
 
-    ESP <-- Wi-Fi --> BRIDGE
+    ESP <-- 📶 Wi-Fi --> BRIDGE
+
+    classDef hw fill:#FFE4E6,stroke:#BE123C,color:#881337
+    classDef brain fill:#FEF3C7,stroke:#B45309,color:#78350F
+    classDef ros fill:#DBEAFE,stroke:#1D4ED8,color:#1E3A8A
+    classDef cfg fill:#DCFCE7,stroke:#15803D,color:#14532D
+    class BTN,IR,SERVO,MOT hw
+    class ESP brain
+    class BRIDGE,DM,RS ros
+    class YAML cfg
 ```
 
 The same `deliverymanager` node drives both the real robot and the simulation. In **real** mode it sends the route to the ESP32. In **sim** mode it sends goals to `move_base`.
 
-## ROS interface
+<details>
+<summary><b>📨 ROS topics and services</b> (click to open)</summary>
+
+<br/>
 
 | Name | Type | Direction | Purpose |
 | --- | --- | --- | --- |
@@ -87,12 +118,15 @@ The same `deliverymanager` node drives both the real robot and the simulation. I
 | `/getroute` | `mediguide/GetRoute` | service | Route between `ward` and `pharmacy` |
 | `/stations` | `visualization_msgs/MarkerArray` | ROS → RViz | Station labels on the map |
 
-## Repository structure
+</details>
+
+## 📂 Repository structure
 
 ```
 MediGuide/
 ├── setup.sh                     # installs dependencies and builds the workspace
 ├── GUIDE.md                     # step-by-step run guide (Roman Urdu)
+├── assets/                      # images for this README
 ├── mediguide/                   # ROS package
 │   ├── scripts/
 │   │   ├── deliverymanager.py   # delivery state machine
@@ -108,14 +142,12 @@ MediGuide/
 └── esp32/MediGuideESP32/        # ESP32 firmware
 ```
 
-## Getting started
+## 🚀 Quick start
 
-### Requirements
+> [!NOTE]
+> Needs **Ubuntu 20.04**. `setup.sh` installs ROS Noetic and every package the project uses.
 
-- Ubuntu 20.04
-- ROS Noetic (installed by `setup.sh` if missing)
-
-### Install and build
+**1. Install and build**
 
 ```bash
 git clone https://github.com/Hafsa-Anwar65/MediGuide.git
@@ -125,7 +157,7 @@ bash setup.sh
 
 Open a new terminal after the script finishes.
 
-### Run the simulation
+**2. Run the simulation**
 
 ```bash
 # Terminal 1: Gazebo hospital, AMCL, move_base and RViz
@@ -135,9 +167,14 @@ roslaunch mediguide simulation.launch
 rosrun mediguide nursepanel.py
 ```
 
-Press `w` to send the robot to the pharmacy and `r` to bring it back. On slower machines, add `gui:=false` to the first command to run without the Gazebo window.
+| Key | Button | Result |
+| :---: | --- | --- |
+| `w` | Ward | Robot goes to the pharmacy |
+| `r` | Return | Robot comes back to the ward |
 
-### Build the map with gmapping
+On slower machines, add `gui:=false` to the first command to run without the Gazebo window.
+
+**3. Build the map with gmapping (optional)**
 
 ```bash
 roslaunch mediguide mapping.launch
@@ -145,12 +182,12 @@ rosrun teleop_twist_keyboard teleop_twist_keyboard.py
 rosrun map_server map_saver -f ~/hospital_map
 ```
 
-## Real robot
+## 🤖 Real robot
 
-### Hardware
+### 🧰 Hardware
 
 | Part | Qty |
-| --- | --- |
+| --- | :---: |
 | Car chassis with 4 DC motors and wheels | 1 |
 | L298N motor driver | 1 |
 | 12V battery and on/off switch | 1 |
@@ -159,9 +196,9 @@ rosrun map_server map_saver -f ~/hospital_map
 | IR obstacle sensor (FC-51) | 1 |
 | SG90 servo | 1 |
 | Push buttons | 2 |
-| Breadboard, jumper wires, small tray | — |
+| Breadboard, jumper wires, small tray | – |
 
-### Wiring
+### 🔌 Wiring
 
 | ESP32 pin | Connects to |
 | --- | --- |
@@ -172,9 +209,10 @@ rosrun map_server map_saver -f ~/hospital_map
 | GPIO 18 / 19 | Ward / Return buttons (other leg to GND) |
 | VIN / GND | Buck converter 5V output |
 
-All grounds must be connected together.
+> [!WARNING]
+> Set the buck converter to **5V** with a multimeter before connecting the ESP32. 12V will destroy it. All grounds must be connected together.
 
-### Flash and run
+### ⚡ Flash and run
 
 1. Open `esp32/MediGuideESP32/MediGuideESP32.ino` in the Arduino IDE.
 2. Install **Rosserial Arduino Library** and **ESP32Servo** from the Library Manager.
@@ -184,7 +222,7 @@ All grounds must be connected together.
    roslaunch mediguide realrobot.launch
    ```
 
-### Set the route
+### 🛣️ Set the route
 
 The path from the ward to the pharmacy lives in `mediguide/config/stations.yaml`:
 
@@ -193,18 +231,34 @@ route_to_pharmacy: ["F150", "R90", "F400", "L90", "F100"]
 ```
 
 | Move | Meaning |
-| --- | --- |
-| `F150` | forward 150 cm |
-| `R90` | turn right 90° |
-| `L90` | turn left 90° |
+| :---: | --- |
+| `F150` | ⬆️ forward 150 cm |
+| `R90` | ↪️ turn right 90° |
+| `L90` | ↩️ turn left 90° |
 
 The return route is built automatically: the order is reversed and left and right are swapped. The motors have no encoders, so distance is measured by time. Calibrate `CM_PER_SECOND` and `MS_PER_90_DEG` in the firmware for your robot.
 
-## Limitations and future work
+## 🔭 Roadmap
 
-- Without wheel encoders, the real robot moves by time, so its accuracy depends on calibration and battery level. Adding encoders or a 2D LiDAR would let the real robot use the same AMCL and move_base stack as the simulation.
-- The current version serves one ward and one pharmacy. More wards can be added as new stations.
+- [x] Delivery state machine with tray lid control
+- [x] Gazebo simulation with AMCL and move_base
+- [x] ESP32 firmware over Wi-Fi
+- [ ] Wheel encoders for more accurate distance
+- [ ] 2D LiDAR so the real robot can use the same navigation stack as the simulation
+- [ ] Support for multiple wards
 
-## License
+## 👩‍💻 Author
+
+**Hafsa Anwar**
+
+[![GitHub](https://img.shields.io/badge/GitHub-Hafsa--Anwar65-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Hafsa-Anwar65)
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Hafsa%20Anwar-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/hafsa-anwar-53b251313)
+
+## 📄 License
 
 Released under the [MIT License](LICENSE).
+
+<div align="center">
+<br/>
+<sub>If you find this project useful, consider giving it a ⭐</sub>
+</div>
